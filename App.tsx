@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react';
 import PhilosophySidebar from './components/PhilosophySidebar';
 import ChatMessage from './components/ChatMessage';
 import ChatInput from './components/ChatInput';
+import ApiKeyModal, { loadApiKey } from './components/ApiKeyModal';
 import { sendMessageToGemini } from './services/gemini';
 import { Message } from './types';
 
@@ -16,6 +17,11 @@ const App: React.FC = () => {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  
+  // API Key State
+  const [apiKey, setApiKey] = useState<string>('');
+  const [isKeyModalOpen, setIsKeyModalOpen] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -26,7 +32,23 @@ const App: React.FC = () => {
     scrollToBottom();
   }, [messages, isLoading]);
 
+  // Load API key on startup
+  useEffect(() => {
+    const savedKey = loadApiKey();
+    if (savedKey) {
+      setApiKey(savedKey);
+    } else {
+      // If no key found, prompt user
+      setIsKeyModalOpen(true);
+    }
+  }, []);
+
   const handleSendMessage = async (text: string) => {
+    if (!apiKey) {
+      setIsKeyModalOpen(true);
+      return;
+    }
+
     const userMessage: Message = {
       role: 'user',
       content: text,
@@ -37,18 +59,18 @@ const App: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const responseText = await sendMessageToGemini(messages.concat(userMessage), text);
+      const responseText = await sendMessageToGemini(messages.concat(userMessage), text, apiKey);
       const botMessage: Message = {
         role: 'model',
         content: responseText,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, botMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
       const errorMessage: Message = {
         role: 'model',
-        content: "연결이 불안정합니다. 당신의 내면의 리듬처럼 잠시 숨을 고르고 다시 시도해주세요.",
+        content: `오류가 발생했습니다: ${error.message || "연결이 불안정합니다."}`,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, errorMessage]);
@@ -57,8 +79,19 @@ const App: React.FC = () => {
     }
   };
 
+  const handleSaveApiKey = (key: string) => {
+    setApiKey(key);
+  };
+
   return (
     <div className="flex h-screen bg-jazz-900 overflow-hidden font-sans">
+      <ApiKeyModal 
+        isOpen={isKeyModalOpen} 
+        onClose={() => setIsKeyModalOpen(false)} 
+        onSave={handleSaveApiKey}
+        initialKey={apiKey}
+      />
+
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div 
@@ -76,7 +109,7 @@ const App: React.FC = () => {
           >
             <X size={24} />
           </button>
-          <PhilosophySidebar />
+          <PhilosophySidebar onOpenSettings={() => setIsKeyModalOpen(true)} />
         </div>
       </div>
 

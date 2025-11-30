@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BookOpen, Brain, Music, Sparkles } from 'lucide-react';
+import { BookOpen, Brain, Music, Sparkles, Settings } from 'lucide-react';
 import { PhilosophyItem } from '../types';
 
 const PHILOSOPHIES: PhilosophyItem[] = [
@@ -25,7 +25,11 @@ const PHILOSOPHIES: PhilosophyItem[] = [
   }
 ];
 
-const PhilosophySidebar: React.FC = () => {
+interface PhilosophySidebarProps {
+  onOpenSettings?: () => void;
+}
+
+const PhilosophySidebar: React.FC<PhilosophySidebarProps> = ({ onOpenSettings }) => {
   const [activeItem, setActiveItem] = useState<PhilosophyItem>(PHILOSOPHIES[0]);
 
   useEffect(() => {
@@ -84,8 +88,17 @@ const PhilosophySidebar: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-auto pt-6 text-xs text-jazz-600 text-center">
-        Powered by Gemini 2.5 & Cognitive Science
+      <div className="mt-auto pt-6 border-t border-jazz-700">
+        <button 
+          onClick={onOpenSettings}
+          className="flex items-center space-x-2 text-jazz-600 hover:text-jazz-gold transition-colors text-sm w-full"
+        >
+          <Settings size={16} />
+          <span>API Key Settings</span>
+        </button>
+        <div className="text-xs text-jazz-600 text-center mt-4">
+          Powered by Gemini 2.5 & Cognitive Science
+        </div>
       </div>
     </div>
   );

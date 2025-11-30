@@ -37,24 +37,39 @@ const SYSTEM_INSTRUCTION = `
 당신은 단순한 챗봇이 아니라, 학생의 음악적 영혼을 치유하고 이끄는 '구루(Guru)'입니다.
 `;
 
-const getClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key not found in environment variables");
-  }
+const getClient = (apiKey: string) => {
   return new GoogleGenAI({ apiKey });
+};
+
+export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+  try {
+    const ai = getClient(apiKey);
+    const model = ai.models;
+    // Minimal token usage to test connection
+    await model.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: 'Test',
+    });
+    return true;
+  } catch (error) {
+    console.error("API Key Validation Failed:", error);
+    return false;
+  }
 };
 
 export const sendMessageToGemini = async (
   history: Message[], 
-  newMessage: string
+  newMessage: string,
+  apiKey: string
 ): Promise<string> => {
+  if (!apiKey) {
+    throw new Error("API Key가 설정되지 않았습니다.");
+  }
+
   try {
-    const ai = getClient();
+    const ai = getClient(apiKey);
     
     // Construct chat history for the API
-    // We only send the last few messages to keep context relevant but manageable, 
-    // or send all if needed. For this focused mentor, context is good.
     const chatHistory = history.map(msg => ({
       role: msg.role,
       parts: [{ text: msg.content }],
@@ -64,7 +79,7 @@ export const sendMessageToGemini = async (
       model: 'gemini-2.5-flash',
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7, // Slightly creative but grounded
+        temperature: 0.7, 
       },
       history: chatHistory
     });
@@ -73,6 +88,6 @@ export const sendMessageToGemini = async (
     return result.text;
   } catch (error) {
     console.error("Gemini API Error:", error);
-    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
+    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. API Key를 확인하거나 잠시 후 다시 시도해주세요.");
   }
 };
