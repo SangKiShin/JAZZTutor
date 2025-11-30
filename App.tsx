@@ -68,12 +68,22 @@ const App: React.FC = () => {
       setMessages(prev => [...prev, botMessage]);
     } catch (error: any) {
       console.error(error);
-      const errorMessage: Message = {
-        role: 'model',
-        content: `오류가 발생했습니다: ${error.message || "연결이 불안정합니다."}`,
-        timestamp: Date.now()
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      
+      if (error.message === 'AUTH_ERROR') {
+        setMessages(prev => [...prev, {
+          role: 'model',
+          content: "API Key가 만료되었거나 유효하지 않습니다. 다시 설정해주세요.",
+          timestamp: Date.now()
+        }]);
+        setIsKeyModalOpen(true);
+      } else {
+        const errorMessage: Message = {
+          role: 'model',
+          content: `오류가 발생했습니다: ${error.message || "연결이 불안정합니다."}`,
+          timestamp: Date.now()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -84,7 +94,7 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="flex h-screen bg-jazz-900 overflow-hidden font-sans">
+    <div className="flex h-[100dvh] bg-jazz-900 overflow-hidden font-sans">
       <ApiKeyModal 
         isOpen={isKeyModalOpen} 
         onClose={() => setIsKeyModalOpen(false)} 
@@ -102,9 +112,9 @@ const App: React.FC = () => {
 
       {/* Sidebar (Desktop & Mobile) */}
       <div className={`fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out lg:relative lg:transform-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="h-full flex flex-col w-80 bg-jazz-900">
+        <div className="h-full flex flex-col w-80 bg-jazz-900 shadow-2xl lg:shadow-none">
            <button 
-            className="absolute top-4 right-4 text-gray-400 lg:hidden"
+            className="absolute top-4 right-4 text-gray-400 lg:hidden hover:text-white"
             onClick={() => setIsSidebarOpen(false)}
           >
             <X size={24} />
@@ -128,7 +138,7 @@ const App: React.FC = () => {
 
         {/* Chat Area */}
         <div className="flex-1 overflow-y-auto px-4 py-6 md:px-8 custom-scrollbar">
-          <div className="max-w-4xl mx-auto space-y-2">
+          <div className="max-w-4xl mx-auto space-y-2 pb-4">
             {messages.map((msg, idx) => (
               <ChatMessage key={idx} message={msg} />
             ))}

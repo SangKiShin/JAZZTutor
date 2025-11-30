@@ -86,8 +86,14 @@ export const sendMessageToGemini = async (
 
     const result = await chat.sendMessage({ message: newMessage });
     return result.text;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Gemini API Error:", error);
-    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. API Key를 확인하거나 잠시 후 다시 시도해주세요.");
+    
+    // Check for authentication errors to prompt re-entry
+    if (error.message?.includes('400') || error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('API key')) {
+      throw new Error("AUTH_ERROR");
+    }
+
+    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
   }
 };
