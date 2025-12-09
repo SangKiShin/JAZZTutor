@@ -1,4 +1,3 @@
-import { GoogleGenAI } from "@google/genai";
 import { Message } from '../types';
 
 // Persona Definition
@@ -37,20 +36,14 @@ const SYSTEM_INSTRUCTION = `
 당신은 단순한 챗봇이 아니라, 학생의 음악적 영혼을 치유하고 이끄는 '구루(Guru)'입니다.
 `;
 
-const getClient = (apiKey: string) => {
-  return new GoogleGenAI({ apiKey });
-};
-
 export const validateApiKey = async (apiKey: string): Promise<boolean> => {
   try {
-    const ai = getClient(apiKey);
-    const model = ai.models;
-    // Minimal token usage to test connection
-    await model.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: 'Test',
+    const response = await fetch('/api/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey })
     });
-    return true;
+    return response.ok;
   } catch (error) {
     console.error("API Key Validation Failed:", error);
     return false;
@@ -67,31 +60,32 @@ export const sendMessageToGemini = async (
   }
 
   try {
-    const ai = getClient(apiKey);
-    
-    // Construct chat history for the API
-    const chatHistory = history.map(msg => ({
-      role: msg.role,
-      parts: [{ text: msg.content }],
-    }));
-
-    const chat = ai.chats.create({
-      model: 'gemini-2.5-flash',
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        temperature: 0.7, 
-      },
-      history: chatHistory
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey,
+        history, // Server handles splitting history and new message
+        message: newMessage,
+        systemInstruction: SYSTEM_INSTRUCTION
+      })
     });
 
-    const result = await chat.sendMessage({ message: newMessage });
-    return result.text;
+    if (!response.ok) {
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("AUTH_ERROR");
+      }
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "서버 통신 오류가 발생했습니다.");
+    }
+
+    const data = await response.json();
+    return data.text;
   } catch (error: any) {
     console.error("Gemini API Error:", error);
     
-    // Check for authentication errors to prompt re-entry
-    if (error.message?.includes('400') || error.message?.includes('401') || error.message?.includes('403') || error.message?.includes('API key')) {
-      throw new Error("AUTH_ERROR");
+    if (error.message === "AUTH_ERROR") {
+      throw error;
     }
 
     throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
