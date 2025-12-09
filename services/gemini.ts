@@ -36,25 +36,41 @@ const SYSTEM_INSTRUCTION = `
 당신은 단순한 챗봇이 아니라, 학생의 음악적 영혼을 치유하고 이끄는 '구루(Guru)'입니다.
 `;
 
-export const validateApiKey = async (apiKey: string): Promise<boolean> => {
+export const validateApiKey = async (apiKey: string): Promise<{ valid: boolean; error?: string }> => {
   try {
-    // Uses the proxy /api/validate which forwards to the backend
     const response = await fetch('/api/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey })
     });
     
+    // Check if the response is actually JSON (to catch 404 HTML pages from SPA fallback)
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      console.error("Received non-JSON response:", await response.text());
+      return { 
+        valid: false, 
+        error: "서버에 연결할 수 없습니다. (Backend not reachable)" 
+      };
+    }
+
+    const data = await response.json();
+    
     if (!response.ok) {
-      console.warn(`Validation failed with status: ${response.status}`);
-      return false;
+      console.warn(`Validation failed with status: ${response.status}`, data);
+      return { 
+        valid: false, 
+        error: data.error || `서버 오류 (${response.status})` 
+      };
     }
     
-    const data = await response.json();
-    return data.valid === true;
-  } catch (error) {
+    return { valid: data.valid === true, error: data.valid ? undefined : "알 수 없는 검증 오류" };
+  } catch (error: any) {
     console.error("API Key Validation Connection Failed:", error);
-    return false;
+    return { 
+      valid: false, 
+      error: "네트워크 오류: 서버와 통신할 수 없습니다." 
+    };
   }
 };
 
@@ -79,15 +95,21 @@ export const sendMessageToGemini = async (
       })
     });
 
+    // Check if response is JSON
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error("서버 응답 형식이 올바르지 않습니다. (Backend connection issue)");
+    }
+
+    const data = await response.json();
+
     if (!response.ok) {
       if (response.status === 401 || response.status === 403) {
         throw new Error("AUTH_ERROR");
       }
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || "서버 통신 오류가 발생했습니다.");
+      throw new Error(data.error || "서버 통신 오류가 발생했습니다.");
     }
 
-    const data = await response.json();
     return data.text;
   } catch (error: any) {
     console.error("Gemini API Error:", error);
@@ -96,6 +118,6 @@ export const sendMessageToGemini = async (
       throw error;
     }
 
-    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
+    throw new Error(error.message || "내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
   }
 };

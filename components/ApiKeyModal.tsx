@@ -9,7 +9,7 @@ interface ApiKeyModalProps {
   initialKey?: string;
 }
 
-// Simple XOR obfuscation for local storage (Not military grade, but prevents plain text reading)
+// Simple XOR obfuscation for local storage
 const encrypt = (text: string) => {
   const key = "INNER_EAR_JAZZ_MENTOR_SECRET";
   let result = "";
@@ -60,14 +60,12 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
     setStatus('testing');
     setErrorMsg('');
 
-    const isValid = await validateApiKey(inputKey.trim());
+    const result = await validateApiKey(inputKey.trim());
 
-    if (isValid) {
+    if (result.valid) {
       setStatus('success');
-      // Save encrypted key
       const encrypted = encrypt(inputKey.trim());
       localStorage.setItem('inner_ear_api_key', encrypted);
-      
       onSave(inputKey.trim());
       
       setTimeout(() => {
@@ -75,7 +73,8 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
       }, 1000);
     } else {
       setStatus('error');
-      setErrorMsg("연결 실패: 유효하지 않은 API Key입니다.");
+      // Show specific error message from server/network
+      setErrorMsg(result.error || "연결 실패: 유효하지 않은 API Key입니다.");
     }
   };
 
@@ -107,8 +106,7 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
           <div className="bg-jazz-700/50 p-3 rounded-lg flex gap-3 text-sm text-gray-300">
             <Lock className="shrink-0 text-jazz-accent mt-0.5" size={16} />
             <p>
-              입력하신 API Key는 안전하게 <strong>암호화되어 브라우저 내부(Local Storage)</strong>에만 저장됩니다. 
-              서버로 전송되지 않습니다.
+              입력하신 API Key는 안전하게 <strong>암호화되어 브라우저 내부</strong>에만 저장됩니다. 
             </p>
           </div>
 
@@ -124,9 +122,17 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
           </div>
 
           {status === 'error' && (
-            <div className="flex items-center gap-2 text-red-400 text-sm bg-red-900/20 p-2 rounded">
-              <AlertCircle size={16} />
-              <span>{errorMsg}</span>
+            <div className="flex items-start gap-2 text-red-400 text-sm bg-red-900/20 p-2 rounded">
+              <AlertCircle size={16} className="shrink-0 mt-0.5" />
+              <div className="flex flex-col">
+                <span className="font-bold">연결 실패</span>
+                <span className="text-xs opacity-90">{errorMsg}</span>
+                {errorMsg.includes("Backend not reachable") && (
+                  <span className="text-xs mt-1 text-red-300 border-t border-red-800/50 pt-1">
+                    Tip: 백엔드 서버(port 3000)가 실행 중인지 확인하세요. (npm run server)
+                  </span>
+                )}
+              </div>
             </div>
           )}
 
