@@ -1,12 +1,20 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { GoogleGenAI } from '@google/genai';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from the build directory
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // API Key Validation Endpoint
 app.post('/api/validate', async (req, res) => {
@@ -40,19 +48,10 @@ app.post('/api/chat', async (req, res) => {
   try {
     const ai = new GoogleGenAI({ apiKey });
 
-    // Client passes the full history including the current message at the end.
-    // We need to separate the "history" for the model context from the "current message" to send.
-    // If the client logic passes [old1, old2, current], we use [old1, old2] as history and current as message.
-    
     let chatHistory = [];
     let messageToSend = message;
 
     if (history && Array.isArray(history) && history.length > 0) {
-      // Assuming the last message in history is the one we want to process if 'message' param matches it
-      // However, usually we reconstruct history from all PREVIOUS messages.
-      // The client calls sendMessageToGemini(messages.concat(userMessage), text...)
-      // So history includes the latest user message. We should exclude it from 'history' passed to create().
-      
       chatHistory = history.slice(0, -1).map(msg => ({
         role: msg.role,
         parts: [{ text: msg.content }],
@@ -74,13 +73,17 @@ app.post('/api/chat', async (req, res) => {
   } catch (error) {
     console.error('Proxy Error:', error);
     
-    // Distinguish authentication errors
     if (error.message?.includes('400') || error.message?.includes('401') || error.message?.includes('API key')) {
       return res.status(401).json({ error: 'AUTH_ERROR' });
     }
     
     res.status(500).json({ error: error.message || 'Internal Server Error' });
   }
+});
+
+// Catch-all handler to serve index.html for any request not handled by API
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
 app.listen(PORT, () => {

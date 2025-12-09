@@ -38,14 +38,22 @@ const SYSTEM_INSTRUCTION = `
 
 export const validateApiKey = async (apiKey: string): Promise<boolean> => {
   try {
+    // Uses the proxy /api/validate which forwards to the backend
     const response = await fetch('/api/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ apiKey })
     });
-    return response.ok;
+    
+    if (!response.ok) {
+      console.warn(`Validation failed with status: ${response.status}`);
+      return false;
+    }
+    
+    const data = await response.json();
+    return data.valid === true;
   } catch (error) {
-    console.error("API Key Validation Failed:", error);
+    console.error("API Key Validation Connection Failed:", error);
     return false;
   }
 };
@@ -65,7 +73,7 @@ export const sendMessageToGemini = async (
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         apiKey,
-        history, // Server handles splitting history and new message
+        history, 
         message: newMessage,
         systemInstruction: SYSTEM_INSTRUCTION
       })
