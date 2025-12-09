@@ -73,7 +73,6 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
       }, 1000);
     } else {
       setStatus('error');
-      // Show specific error message from server/network
       setErrorMsg(result.error || "연결 실패: 유효하지 않은 API Key입니다.");
     }
   };
@@ -127,15 +126,6 @@ const ApiKeyModal: React.FC<ApiKeyModalProps> = ({ isOpen, onClose, onSave, init
               <div className="flex flex-col">
                 <span className="font-bold">연결 실패</span>
                 <span className="text-xs opacity-90">{errorMsg}</span>
-                {errorMsg.includes("Backend not reachable") && (
-                  <div className="text-xs mt-2 text-red-300 border-t border-red-800/50 pt-1">
-                    <p className="font-bold">원인: 백엔드 서버가 응답하지 않습니다.</p>
-                    <ul className="list-disc pl-4 mt-1 space-y-1">
-                      <li>배포/Preview 환경: <code className="bg-black/30 px-1 rounded">npm run start</code> 또는 <code className="bg-black/30 px-1 rounded">npm run preview</code>를 실행했는지 확인하세요.</li>
-                      <li>로컬 개발(Dev): <code className="bg-black/30 px-1 rounded">npm run server</code>를 별도 터미널에서 실행해야 합니다.</li>
-                    </ul>
-                  </div>
-                )}
               </div>
             </div>
           )}

@@ -1,3 +1,4 @@
+import { GoogleGenAI } from "@google/genai";
 import { Message } from '../types';
 
 // Persona Definition
@@ -38,38 +39,26 @@ const SYSTEM_INSTRUCTION = `
 
 export const validateApiKey = async (apiKey: string): Promise<{ valid: boolean; error?: string }> => {
   try {
-    const response = await fetch('/api/validate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey })
+    const ai = new GoogleGenAI({ apiKey });
+    // Minimal token usage to test connection
+    await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [{ text: 'Test' }] },
     });
+    return { valid: true };
+  } catch (error: any) {
+    console.error("API Key Validation Failed:", error);
+    let errorMessage = "유효하지 않은 API Key입니다.";
     
-    // Check if the response is actually JSON (to catch 404 HTML pages from SPA fallback)
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      console.error("Received non-JSON response:", await response.text());
-      return { 
-        valid: false, 
-        error: "서버에 연결할 수 없습니다. (Backend not reachable)" 
-      };
+    if (error.message?.includes("API key not valid")) {
+        errorMessage = "API Key가 올바르지 않습니다. (Invalid Key)";
+    } else if (error.message?.includes("Failed to fetch")) {
+        errorMessage = "네트워크 오류: 인터넷 연결을 확인해주세요.";
     }
 
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.warn(`Validation failed with status: ${response.status}`, data);
-      return { 
-        valid: false, 
-        error: data.error || `서버 오류 (${response.status})` 
-      };
-    }
-    
-    return { valid: data.valid === true, error: data.valid ? undefined : "알 수 없는 검증 오류" };
-  } catch (error: any) {
-    console.error("API Key Validation Connection Failed:", error);
     return { 
       valid: false, 
-      error: "네트워크 오류: 서버와 통신할 수 없습니다." 
+      error: errorMessage
     };
   }
 };
@@ -84,40 +73,38 @@ export const sendMessageToGemini = async (
   }
 
   try {
-    const response = await fetch('/api/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey,
-        history, 
-        message: newMessage,
-        systemInstruction: SYSTEM_INSTRUCTION
-      })
+    const ai = new GoogleGenAI({ apiKey });
+
+    // Convert history to Gemini format
+    // Note: The first message is system instruction, handled separately in config
+    let chatHistory = [];
+    if (history.length > 0) {
+        // Filter out system messages if any, though our type only has user/model
+        chatHistory = history.map(msg => ({
+            role: msg.role,
+            parts: [{ text: msg.content }],
+        }));
+    }
+
+    const chat = ai.chats.create({
+      model: 'gemini-2.5-flash',
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        temperature: 0.7,
+      },
+      history: chatHistory
     });
 
-    // Check if response is JSON
-    const contentType = response.headers.get("content-type");
-    if (!contentType || !contentType.includes("application/json")) {
-      throw new Error("서버 응답 형식이 올바르지 않습니다. (Backend connection issue)");
-    }
+    const result = await chat.sendMessage({ message: newMessage });
+    return result.text;
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      if (response.status === 401 || response.status === 403) {
-        throw new Error("AUTH_ERROR");
-      }
-      throw new Error(data.error || "서버 통신 오류가 발생했습니다.");
-    }
-
-    return data.text;
   } catch (error: any) {
     console.error("Gemini API Error:", error);
     
-    if (error.message === "AUTH_ERROR") {
-      throw error;
+    if (error.message?.includes("400") || error.message?.includes("403") || error.message?.includes("API key")) {
+      throw new Error("AUTH_ERROR");
     }
 
-    throw new Error(error.message || "내면의 목소리를 듣는 데 잡음이 섞였습니다. 잠시 후 다시 시도해주세요.");
+    throw new Error("내면의 목소리를 듣는 데 잡음이 섞였습니다. (API 연결 오류)");
   }
 };
